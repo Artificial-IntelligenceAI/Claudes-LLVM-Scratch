@@ -64,11 +64,12 @@ def js_number_literal(s):
 
 
 class V:
-    """A compiled value. kind in num/bool/str/any. For any, a=tag, b=bits."""
-    __slots__ = ("kind", "a", "b", "owned")
+    """A compiled value. kind in num/bool/str/any. For any, a=tag, b=bits.
+    nonan: a num known not to be NaN (Cast.toNumber would otherwise map NaN to 0)."""
+    __slots__ = ("kind", "a", "b", "owned", "nonan")
 
-    def __init__(self, kind, a, b=None, owned=False):
-        self.kind, self.a, self.b, self.owned = kind, a, b, owned
+    def __init__(self, kind, a, b=None, owned=False, nonan=False):
+        self.kind, self.a, self.b, self.owned, self.nonan = kind, a, b, owned, nonan
 
 
 class Fn:
@@ -221,8 +222,12 @@ class CodeGen:
         v.owned = False
 
     def to_num(self, ctx, v):
+        """Cast.toNumber: NaN becomes 0."""
         if v.kind == NUM:
-            return v.a
+            if v.nonan:
+                return v.a
+            isnan = self.op2(ctx, f"fcmp uno double {v.a}, 0.0")
+            return self.op2(ctx, f"select i1 {isnan}, double 0.0, double {v.a}")
         if v.kind == BOOL:
             return self.op2(ctx, f"uitofp i1 {v.a} to double")
         if v.kind == STR:
@@ -357,7 +362,7 @@ class CodeGen:
         if isinstance(value, bool):
             return V(BOOL, "true" if value else "false")
         if isinstance(value, float):
-            return V(NUM, hexd(value))
+            return V(NUM, hexd(value), nonan=value == value)
         return V(STR, self.str_lit(str(value)))
 
     def expr(self, ctx, e):
@@ -434,7 +439,7 @@ class CodeGen:
             return V(NUM, self.call(ctx, "rt_mod", [("double", a), ("double", b)]))
         if op == "operator_round":
             vals = self.eval_args(ctx, e)
-            return V(NUM, self.call(ctx, "rt_round", [("double", self.num_arg(ctx, vals, "NUM"))]))
+            return V(NUM, self.call(ctx, "rt_round", [("double", self.num_arg(ctx, vals, "NUM"))]), nonan=True)
         if op == "operator_mathop":
             vals = self.eval_args(ctx, e)
             n = self.num_arg(ctx, vals, "NUM")
@@ -444,9 +449,9 @@ class CodeGen:
                 return V(NUM, hexd(0.0))
             if name in ("abs", "floor", "sqrt"):
                 intr = {"abs": "fabs", "floor": "floor", "sqrt": "sqrt"}[name]
-                return V(NUM, self.op2(ctx, f"call double @llvm.{intr}.f64(double {n})"))
+                return V(NUM, self.op2(ctx, f"call double @llvm.{intr}.f64(double {n})"), nonan=name != "sqrt")
             if name == "ceiling":
-                return V(NUM, self.op2(ctx, f"call double @llvm.ceil.f64(double {n})"))
+                return V(NUM, self.op2(ctx, f"call double @llvm.ceil.f64(double {n})"), nonan=True)
             return V(NUM, self.call(ctx, "rt_mathop", [("i32", str(code)), ("double", n)]))
         if op == "operator_random":
             vals = self.eval_args(ctx, e)
@@ -492,7 +497,7 @@ class CodeGen:
             s = self.to_str(ctx, vals.get("STRING", self.lit(ctx, "")))
             r = self.call(ctx, "rt_length", [("ptr", s.a)])
             self.release(ctx, s)
-            return V(NUM, r)
+            return V(NUM, r, nonan=True)
         if op == "operator_contains":
             vals = self.eval_args(ctx, e)
             a = self.to_str(ctx, vals.get("STRING1", self.lit(ctx, "")))
@@ -517,11 +522,11 @@ class CodeGen:
             a = self.to_any(ctx, vals.get("ITEM", self.lit(ctx, "")))
             r = self.call(ctx, "rt_list_index_of", [("ptr", self.list_ptr(ctx, e.ref)), ("i64", a.a), ("i64", a.b)])
             self.release(ctx, a)
-            return V(NUM, r)
+            return V(NUM, r, nonan=True)
         if op == "data_lengthoflist":
             lp = self.list_ptr(ctx, e.ref)
             n = self.load(ctx, "i32", self.gep(ctx, lp, self.off["List.len"]))
-            return V(NUM, self.op2(ctx, f"sitofp i32 {n} to double"))
+            return V(NUM, self.op2(ctx, f"sitofp i32 {n} to double"), nonan=True)
         if op == "data_listcontainsitem":
             vals = self.eval_args(ctx, e)
             a = self.to_any(ctx, vals.get("ITEM", self.lit(ctx, "")))

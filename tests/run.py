@@ -55,7 +55,10 @@ def parse(out):
     for line in out.splitlines():
         line = line.strip()
         if line:
-            events.append(json.loads(line))
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                events.append({"t": "INVALID-JSON", "raw": line[:200]})
     return events
 
 

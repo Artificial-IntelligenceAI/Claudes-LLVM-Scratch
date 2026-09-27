@@ -318,7 +318,10 @@ const main = async () => {
         if (idle && !hasEdgeHats) { frame++; break; }
     }
     emit({t: 'end', f: frame, targets: rt.executableTargets.slice().reverse().map(targetState)});
-    process.stdout.write(out.join('\n') + '\n');
+    // synchronous: process.exit() can truncate pending async pipe writes
+    const buf = Buffer.from(out.join('\n') + '\n');
+    let off = 0;
+    while (off < buf.length) off += fs.writeSync(1, buf, off, buf.length - off);
     process.exit(0);
 };
 
