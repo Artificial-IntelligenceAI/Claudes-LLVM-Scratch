@@ -266,13 +266,14 @@ const main = async () => {
     rt.on('SAY', (target, type, text) => {
         emit({t: type, f: frame, s: target.getName(), v: S(text)});
     });
+    // Questions are answered at the start of the next frame (one per frame),
+    // which the native runtime reproduces exactly.
     let answerIdx = 0;
+    let questionPending = false;
     rt.on('QUESTION', q => {
-        if (q === null) return;
-        const a = answerIdx < answers.length ? answers[answerIdx++] : '';
+        if (q === null) { questionPending = false; return; }
         emit({t: 'ask', f: frame, v: S(q)});
-        // Answer asynchronously, like a user would.
-        Promise.resolve().then(() => rt.emit('ANSWER', a));
+        questionPending = true;
     });
 
     const data = fs.readFileSync(file);
@@ -295,6 +296,12 @@ const main = async () => {
     };
     await flush();
     for (frame = 0; frame < MAX_FRAMES; frame++) {
+        if (questionPending) {
+            questionPending = false;
+            const a = answerIdx < answers.length ? answers[answerIdx++] : '';
+            rt.emit('ANSWER', a);
+            await flush();
+        }
         // Fire virtual timers that are due.
         timers.sort((a, b) => a.at - b.at || a.id - b.id);
         while (timers.length && timers[0].at <= virtualNow) {
@@ -303,7 +310,7 @@ const main = async () => {
         }
         rt._step();
         await flush();
-        const idle = rt.threads.length === 0 && timers.length === 0;
+        const idle = rt.threads.length === 0 && timers.length === 0 && !questionPending;
         virtualNow += FRAME_MS;
         if (idle && !hasEdgeHats) { frame++; break; }
     }

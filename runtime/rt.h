@@ -94,6 +94,11 @@ typedef struct Frame {
     double timer_start;  /* stack timer (wait, glide) */
     double timer_dur;
     double glide_x0, glide_y0, glide_x1, glide_y1;
+    int32_t timer_on;    /* stack timer initialised (stackTimerNeedsInit) */
+    int32_t started_init;/* broadcast-and-wait: threads already started */
+    int64_t *started;    /* broadcast-and-wait: uids of started threads */
+    int32_t nstarted;
+    int32_t executed;    /* ask: question already asked */
     Value slots[];       /* params first, then temporaries */
 } Frame;
 
@@ -201,11 +206,11 @@ typedef struct Thread {
     int64_t wake_seq;
     int32_t wait_kind;   /* 1 timer, 2 answer */
     int32_t in_list;     /* still present in runtime.threads (for broadcast-and-wait) */
-    int32_t id;
+    int32_t detached;    /* replaced in the thread list by a restart while it was running */
+    int64_t uid;         /* unique identity (JS object identity of the Thread) */
+    int32_t answer_pending;
 } Thread;
 
-/* A reference to a started thread for broadcast-and-wait. */
-typedef struct ThreadRef { Thread *t; int32_t generation; } ThreadRef;
 
 /* ------------------------------------------------------------------------ */
 /* Runtime API used by generated code                                        */
@@ -284,12 +289,13 @@ extern int32_t rt_stop_flag;    /* stop all happened during direct (warp) code *
 /* threads / frames */
 Frame *rt_push_frame(struct Thread *th, ResumableFn fn, int32_t nslots, int32_t proc_id, int32_t warp);
 bool rt_is_recursive_call(struct Thread *th, int32_t proc_id);
+bool rt_is_recursive_call_at(struct Thread *th, int32_t proc_id, int32_t depth);
 void rt_yield_skip_check(void);
 
 /* events / control */
 void rt_broadcast(Str *name);
 int32_t rt_broadcast_and_wait(struct Thread *th, struct Frame *fr, Str *name, int32_t first); /* returns R_* or -1 to continue */
-void rt_stop_all(struct Thread *th);
+void rt_stop_all(struct Thread *th);            /* the calling thread is always stopped */
 void rt_stop_other_scripts(struct Thread *th);
 void rt_create_clone(Target *self, Str *which);
 int32_t rt_delete_clone(struct Thread *th);
@@ -379,6 +385,25 @@ Script *rt_add_script(Sprite *s, int32_t hat, ResumableFn fn, int32_t nslots, St
 
 /* the compiler provides this */
 void rt_program_init(void);
+
+/* scheduler internals shared by the block implementations */
+void rt_request_redraw(void);
+double rt_now_ms(void);
+Target *rt_sprite_original_by_name(Str *name);
+Target **rt_exec_targets(int32_t *n);
+void rt_emit_say(Target *t, int32_t think, Value v);
+void rt_pen_trace_line(Target *t, double x0, double y0, double x1, double y1);
+void rt_pen_trace_point(Target *t, double x, double y);
+void rt_pen_trace_clear(void);
+void rt_pen_trace_stamp(Target *t);
+void rt_stop_for_target(Target *t, Thread *except);
+void rt_bubbles_reset(void);
+void rt_bubble_target_exit(Target *t);
+int64_t rt_start_hats(int32_t hat, Str *match, Target *only, int64_t **started, int32_t *nstarted);
+Str *rt_empty_str(void);
+int rt_js_num_format(double d, char *buf);
+extern int32_t rt_deterministic;
+extern int32_t rt_frame;
 
 /* trace / diagnostics */
 extern int32_t rt_trace_enabled;
