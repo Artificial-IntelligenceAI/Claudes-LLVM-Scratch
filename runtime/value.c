@@ -322,7 +322,7 @@ __attribute__((constructor)) static void init_consts(void) {
 
 Str *rt_empty_str(void) { return str_empty; }
 
-double rt_tonum(Value v) {
+__attribute__((always_inline)) double rt_tonum(Value v) {
     if (v.tag == T_NUM) {
         double d = bits2d(v.bits);
         return d != d ? 0.0 : d;

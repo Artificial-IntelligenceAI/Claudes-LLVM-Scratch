@@ -16,13 +16,19 @@ double cg_str_tonum(Str *s) {
     return d != d ? 0.0 : d;
 }
 
-/* Cast.compare for two numbers: NaN falls back to the string comparison. */
+/* Cast.compare for two numbers. With a NaN operand scratch-vm compares
+ * String(a).toLowerCase() with String(b).toLowerCase(): "nan" against a
+ * number's string, which always starts with a digit, '-' or "infinity" --
+ * all of which sort before 'n'. So NaN is greater than every number and
+ * equal to NaN, and no call is needed (keeping hot loops call-free). */
 int32_t cg_cmp_nn(double a, double b) {
     if (a == a && b == b) return a < b ? -1 : (a > b ? 1 : 0);
-    return rt_compare(v_num(a), v_num(b));
+    if (a != a && b != b) return 0;
+    return a != a ? 1 : -1;
 }
 
 int32_t cg_cmp(Value a, Value b) {
+    if (a.tag == T_NUM && b.tag == T_NUM) return cg_cmp_nn(bits2d(a.bits), bits2d(b.bits));
     int c = rt_compare(a, b);
     return c < 0 ? -1 : (c > 0 ? 1 : 0);
 }

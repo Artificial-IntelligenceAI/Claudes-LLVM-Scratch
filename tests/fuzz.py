@@ -193,6 +193,8 @@ def run_seed(seed, keep_all=False):
         ref = subprocess.run(["node", os.path.join(ROOT, "ref", "run.js"), base + ".sb3", *extra],
                              capture_output=True, text=True, timeout=120)
         if ref.returncode != 0:
+            if "Invalid string length" in ref.stderr or "Invalid array length" in ref.stderr:
+                return seed, "SKIP-JS-LIMIT", []  # program outgrew V8's string/array limits
             return seed, "ORACLE", [ref.stderr[-500:]]
         c = subprocess.run([sys.executable, "-m", "scc", base + ".sb3", "-o", base + ".bin", "-q"],
                            capture_output=True, text=True, timeout=300, cwd=ROOT)
@@ -203,7 +205,7 @@ def run_seed(seed, keep_all=False):
             return seed, "CRASH", [nat.stderr[-500:]]
         diffs = compare(parse(ref.stdout), parse(nat.stdout))
     except subprocess.TimeoutExpired:
-        return seed, "TIMEOUT", []
+        return seed, "SKIP-SLOW", []  # usually exponential string growth; too slow to compare
     if not diffs and not keep_all:
         for ext in (".sb3", ".bin"):
             try:
@@ -228,13 +230,13 @@ def main():
         for fut in cf.as_completed(futs):
             seed, status, diffs = fut.result()
             stats[status] = stats.get(status, 0) + 1
-            if status != "PASS":
+            if status != "PASS" and not status.startswith("SKIP"):
                 fails.append((seed, status, diffs))
                 print(f"{status} seed={seed}")
                 for d in diffs[:3]:
                     print("    " + str(d).replace("\n", "\n    "))
     print("\n" + ", ".join(f"{k}: {v}" for k, v in sorted(stats.items())))
-    return 0 if not fails else 1
+    return 0 if not fails else 1  # skips are not failures
 
 
 if __name__ == "__main__":

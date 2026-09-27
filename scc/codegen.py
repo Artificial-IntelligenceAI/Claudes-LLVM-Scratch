@@ -63,13 +63,38 @@ def js_number_literal(s):
     return None
 
 
+_JS_WS = "\t\n\v\f\r \u00a0\u1680\u2028\u2029\u202f\u205f\u3000\ufeff" + "".join(chr(c) for c in range(0x2000, 0x200B))
+
+
+def js_number(s):
+    """Exact JS Number(string) (StringToNumber), NaN as float('nan')."""
+    import re
+    t = s.strip(_JS_WS)
+    if t == "":
+        return 0.0
+    if t in ("Infinity", "+Infinity"):
+        return float("inf")
+    if t == "-Infinity":
+        return float("-inf")
+    for prefix, base in (("0x", 16), ("0X", 16), ("0o", 8), ("0O", 8), ("0b", 2), ("0B", 2)):
+        if t.startswith(prefix):
+            digits = t[2:]
+            try:
+                return float(int(digits, base)) if digits and "_" not in digits and digits.isalnum() else float("nan")
+            except ValueError:
+                return float("nan")
+    if re.fullmatch(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?", t):
+        return float(t)  # both are correctly rounded
+    return float("nan")
+
+
 class V:
     """A compiled value. kind in num/bool/str/any. For any, a=tag, b=bits.
     nonan: a num known not to be NaN (Cast.toNumber would otherwise map NaN to 0)."""
-    __slots__ = ("kind", "a", "b", "owned", "nonan")
+    __slots__ = ("kind", "a", "b", "owned", "nonan", "lit")
 
-    def __init__(self, kind, a, b=None, owned=False, nonan=False):
-        self.kind, self.a, self.b, self.owned, self.nonan = kind, a, b, owned, nonan
+    def __init__(self, kind, a, b=None, owned=False, nonan=False, lit=None):
+        self.kind, self.a, self.b, self.owned, self.nonan, self.lit = kind, a, b, owned, nonan, lit
 
 
 class Fn:
@@ -222,7 +247,10 @@ class CodeGen:
         v.owned = False
 
     def to_num(self, ctx, v):
-        """Cast.toNumber: NaN becomes 0."""
+        """Cast.toNumber: NaN becomes 0. Literal strings fold at compile time."""
+        if v.kind == STR and v.lit is not None:
+            n = js_number(v.lit)
+            return hexd(0.0 if n != n else n)
         if v.kind == NUM:
             if v.nonan:
                 return v.a
@@ -241,6 +269,9 @@ class CodeGen:
     def to_bool(self, ctx, v):
         if v.kind == BOOL:
             return v.a
+        if v.lit is not None and v.kind == STR:
+            t = v.lit
+            return "false" if (t == "" or t == "0" or t.lower() == "false") else "true"
         if v.kind == NUM:
             a = self.op2(ctx, f"fcmp une double {v.a}, 0.0")  # true if != 0 or NaN
             b = self.op2(ctx, f"fcmp ord double {v.a}, 0.0")  # false if NaN
@@ -362,8 +393,8 @@ class CodeGen:
         if isinstance(value, bool):
             return V(BOOL, "true" if value else "false")
         if isinstance(value, float):
-            return V(NUM, hexd(value), nonan=value == value)
-        return V(STR, self.str_lit(str(value)))
+            return V(NUM, hexd(value), nonan=value == value, lit=value)
+        return V(STR, self.str_lit(str(value)), lit=str(value))
 
     def expr(self, ctx, e):
         if isinstance(e, Lit):

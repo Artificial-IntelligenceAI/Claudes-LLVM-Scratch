@@ -63,10 +63,147 @@ YIELDING = {
 IMPURE_REPORTERS = {"operator_random"}
 
 
+# Blocks whose behaviour depends on whether an input is a string or a number
+# (beyond Cast.toNumber/toString): costume/backdrop lookup by name vs index.
+IDENTITY_SINKS = {
+    "looks_switchcostumeto": "COSTUME",
+    "looks_switchbackdropto": "BACKDROP",
+    "looks_switchbackdroptoandwait": "BACKDROP",
+}
+LIST_WRITES = {"data_addtolist": "ITEM", "data_insertatlist": "ITEM", "data_replaceitemoflist": "ITEM"}
+
+
+def integer_string(v):
+    """An integer literal string whose String(Number(v)) === v, e.g. "0", "-12".
+    Such a string is indistinguishable from the number except by typeof."""
+    if not isinstance(v, str) or not v:
+        return False
+    body = v[1:] if v[0] == "-" else v
+    if not body.isdigit() or not body.isascii() or (len(body) > 1 and body[0] == "0") or v == "-0":
+        return False
+    return abs(int(v)) < 2 ** 53
+
+
 class Analyzer:
     def __init__(self, prog):
         self.prog = prog
         self.changed = False
+
+    # -- string identity ---------------------------------------------------------------
+    #
+    # A value's *identity* (string "5" vs number 5) is observable only by:
+    #   - list contents joining (single-letter strings join without spaces),
+    #   - costume/backdrop switching (name lookup vs index).
+    # Values flow unchanged through variables, parameters and list items. A
+    # store target is "sensitive" if identity-preserving reads of it can reach
+    # one of those observers. Integer literal strings stored into insensitive
+    # targets are replaced by numbers, which lets the type inference prove
+    # loop counters, indices and accumulators numeric.
+
+    def _sources(self, e, proc):
+        """Identity-preserving sources of an expression's value."""
+        if isinstance(e, VarGet):
+            return [("var", e.var)]
+        if isinstance(e, ArgGet):
+            return [("param", (proc, e.index))]
+        if isinstance(e, Op) and e.opcode == "data_itemoflist":
+            return [("list", e.ref)]
+        if isinstance(e, Op) and e.opcode == "sensing_of":
+            name = str(e.fields.get("PROPERTY", ""))
+            return [("var", v) for s in self.prog.sprites if not s.is_stage for v in s.vars if v.name == name]
+        return []
+
+    def _mark(self, e, proc):
+        for kind, x in self._sources(e, proc):
+            key = (kind, id(x) if kind != "param" else (id(x[0]), x[1]))
+            if key not in self.sensitive:
+                self.sensitive.add(key)
+                self.changed = True
+
+    def _is_sens(self, kind, x):
+        return (kind, id(x) if kind != "param" else (id(x[0]), x[1])) in self.sensitive
+
+    def _walk_exprs(self, e, fn):
+        fn(e)
+        if isinstance(e, Op):
+            for a in e.args.values():
+                self._walk_exprs(a, fn)
+
+    def _sens_stmts(self, stmts, proc):
+        for s in stmts:
+            if isinstance(s, If):
+                self._sens_expr(s.cond, proc)
+                self._sens_stmts(s.then, proc)
+                self._sens_stmts(s.else_, proc)
+            elif isinstance(s, Loop):
+                if s.arg is not None:
+                    self._sens_expr(s.arg, proc)
+                self._sens_stmts(s.body, proc)
+            elif isinstance(s, Call):
+                for i, a in enumerate(s.args):
+                    self._sens_expr(a, proc)
+                    if self._is_sens("param", (s.proc, i)):
+                        self._mark(a, proc)
+            elif isinstance(s, Op):
+                for a in s.args.values():
+                    self._sens_expr(a, proc)
+                op = s.opcode
+                if op in IDENTITY_SINKS and IDENTITY_SINKS[op] in s.args:
+                    self._mark(s.args[IDENTITY_SINKS[op]], proc)
+                elif op == "data_setvariableto" and self._is_sens("var", s.ref):
+                    self._mark(s.args.get("VALUE", Lit("")), proc)
+                elif op in LIST_WRITES and self._is_sens("list", s.ref):
+                    self._mark(s.args.get("ITEM", Lit("")), proc)
+
+    def _sens_expr(self, e, proc):
+        def visit(x):
+            if isinstance(x, ListContents):
+                key = ("list", id(x.lst))
+                if key not in self.sensitive:
+                    self.sensitive.add(key)
+                    self.changed = True
+        self._walk_exprs(e, visit)
+
+    def _numify_stmts(self, stmts, proc):
+        def num(e):
+            if isinstance(e, Lit) and integer_string(e.value):
+                return Lit(float(e.value))
+            return e
+        for s in stmts:
+            if isinstance(s, If):
+                self._numify_stmts(s.then, proc)
+                self._numify_stmts(s.else_, proc)
+            elif isinstance(s, Loop):
+                self._numify_stmts(s.body, proc)
+            elif isinstance(s, Call):
+                for i in range(len(s.args)):
+                    if not self._is_sens("param", (s.proc, i)):
+                        s.args[i] = num(s.args[i])
+            elif isinstance(s, Op):
+                if s.opcode == "data_setvariableto" and not self._is_sens("var", s.ref) and "VALUE" in s.args:
+                    s.args["VALUE"] = num(s.args["VALUE"])
+                elif s.opcode in LIST_WRITES and not self._is_sens("list", s.ref) and "ITEM" in s.args:
+                    s.args["ITEM"] = num(s.args["ITEM"])
+
+    def numify(self):
+        self.sensitive = set()
+        bodies = [(p.body, p) for p in self.prog.procs] + [(sc.body, None) for sc in self.prog.scripts]
+        while True:
+            self.changed = False
+            for body, proc in bodies:
+                self._sens_stmts(body, proc)
+            if not self.changed:
+                break
+        for body, proc in bodies:
+            self._numify_stmts(body, proc)
+        for sp in self.prog.sprites:
+            for v in sp.vars:
+                if not self._is_sens("var", v) and integer_string(v.value):
+                    v.value = float(v.value)
+            for L in sp.lists:
+                if not self._is_sens("list", L):
+                    L.value = [float(x) if integer_string(x) else x for x in L.value]
+        self.stats = {"sensitive": len(self.sensitive)}
 
     # -- types --------------------------------------------------------------------
 
@@ -192,6 +329,7 @@ class Analyzer:
                 break
 
     def run(self):
+        self.numify()
         self.infer_types()
         self.infer_atomic()
         return self.prog
