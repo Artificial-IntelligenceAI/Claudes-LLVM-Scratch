@@ -1,0 +1,9 @@
+node_modules/
+build/
+out/
+*.o
+*.bc
+*.ll.tmp
+__pycache__/
+*.pyc
+/tmp/
