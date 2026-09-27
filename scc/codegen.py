@@ -565,7 +565,8 @@ class CodeGen:
         if op == "sensing_answer":
             return V(STR, self.call(ctx, "rt_answer", []), owned=True)
         if op in ("sensing_mousex", "sensing_mousey"):
-            return V(NUM, hexd(0.0))
+            # scratch-vm's Mouse leaves _scratchX undefined until the first mouse event
+            return V(STR, self.str_lit("undefined"))
         if op == "sensing_loudness":
             return V(NUM, hexd(-1.0))
         if op == "sensing_timer":
@@ -666,22 +667,24 @@ class CodeGen:
         return loop._alloca
 
     def loop(self, ctx, s):
+        """Loops re-execute their block at every iteration (scratch-vm re-runs the
+        C-block, re-evaluating its inputs). `head` is the re-execution entry;
+        the first execution enters at `check` for repeat so TIMES is evaluated
+        exactly once per execution."""
         f = ctx.fn
         head, body, exit_ = f.label("head"), f.label("body"), f.label("exit")
-        cp = None
         if s.kind == "repeat":
+            check = f.label("check")
             times = self.to_num(ctx, self.expr(ctx, s.arg))
             n = self.call(ctx, "rt_round", [("double", times)])
             cp = self.counter_ptr(ctx, s)
             self.store(ctx, "double", n, cp)
-        elif s.kind == "for_each":
-            cp = self.counter_ptr(ctx, s)
-            self.store(ctx, "double", "0.0", cp)
-        f.emit(f"br label %{head}")
-        f.block(head)
-        if s.kind == "repeat":
+            f.emit(f"br label %{check}")
+            f.block(head)
             if not is_pure(s.arg):
-                self.release(ctx, self.expr(ctx, s.arg))  # re-evaluated each execution
+                self.release(ctx, self.expr(ctx, s.arg))  # re-evaluated, value unused
+            f.emit(f"br label %{check}")
+            f.block(check)
             cp = self.counter_ptr(ctx, s)
             c = self.load(ctx, "double", cp)
             c2 = self.op2(ctx, f"fsub double {c}, 1.0")
@@ -689,14 +692,22 @@ class CodeGen:
             go = self.op2(ctx, f"fcmp oge double {c2}, 0.0")
             f.emit(f"br i1 {go}, label %{body}, label %{exit_}")
         elif s.kind == "forever":
+            f.emit(f"br label %{head}")
+            f.block(head)
             f.emit(f"br label %{body}")
         elif s.kind in ("until", "while"):
+            f.emit(f"br label %{head}")
+            f.block(head)
             c = self.to_bool(ctx, self.expr(ctx, s.arg))
             if s.kind == "until":
                 f.emit(f"br i1 {c}, label %{exit_}, label %{body}")
             else:
                 f.emit(f"br i1 {c}, label %{body}, label %{exit_}")
         elif s.kind == "for_each":
+            cp = self.counter_ptr(ctx, s)
+            self.store(ctx, "double", "0.0", cp)
+            f.emit(f"br label %{head}")
+            f.block(head)
             v = self.to_any(ctx, self.expr(ctx, s.arg))
             lim = self.call(ctx, "cg_js_number", [("i64", v.a), ("i64", v.b)])
             self.release(ctx, v)
@@ -774,6 +785,7 @@ class CodeGen:
             f.emit(f"br label %{lj}")
             f.block(lr)
             self.resumable_call(ctx, p, vals, dynamic_warp=False)
+            f.emit(f"br label %{lj}")
             f.block(lj)
             return
         self.resumable_call(ctx, p, vals, dynamic_warp=True)

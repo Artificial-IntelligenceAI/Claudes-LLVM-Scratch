@@ -278,6 +278,9 @@ const main = async () => {
 
     const data = fs.readFileSync(file);
     await vm.loadProject(data);
+    // Library code (immutable.js hash seeding) consumes randomness while
+    // loading; the Scratch-visible stream starts here.
+    rngState = SEED;
 
     // Deterministic tick budget: at most TICKS ticks per frame.
     rt.currentStepTime = FRAME_MS;

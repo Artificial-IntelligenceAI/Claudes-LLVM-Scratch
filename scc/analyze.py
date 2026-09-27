@@ -41,10 +41,11 @@ NUM_OPS = {
     "operator_round", "operator_mathop", "operator_random", "operator_length",
     "data_itemnumoflist", "data_lengthoflist", "motion_xposition", "motion_yposition",
     "motion_direction", "looks_size", "sensing_distanceto", "sensing_loudness", "sensing_timer",
-    "sensing_current", "sensing_dayssince2000", "sensing_mousex", "sensing_mousey",
+    "sensing_current", "sensing_dayssince2000",
     "control_get_counter", "sound_volume",
 }
-STR_OPS = {"operator_join", "operator_letter_of", "sensing_answer", "sensing_username"}
+STR_OPS = {"operator_join", "operator_letter_of", "sensing_answer", "sensing_username",
+           "sensing_mousex", "sensing_mousey"}
 BOOL_OPS = {
     "operator_lt", "operator_gt", "operator_equals", "operator_and", "operator_or", "operator_not",
     "operator_contains", "data_listcontainsitem", "sensing_touchingobject", "sensing_touchingcolor",

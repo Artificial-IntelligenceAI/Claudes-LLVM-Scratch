@@ -99,10 +99,16 @@ _ATTR = re.compile(
     r"|\b(dereferenceable|dereferenceable_or_null|align|range)\s*\([^)]*\)|\balign\s+\d+")
 
 
+_TYPE = re.compile(r"\{[^}]*\}|\bptr\b|\bdouble\b|\bfloat\b|\bvoid\b|\bi\d+\b")
+
+
 def _clean_type(t):
-    t = _ATTR.sub(" ", t)
-    t = re.sub(r"%[\w.]+\s*$", "", t.strip())  # parameter name
-    return " ".join(t.split())
+    """Extract the IR type from a parameter/return string, ignoring attributes."""
+    t = re.sub(r"\b\w+\([^)]*\)", " ", t)  # attributes with arguments, e.g. range(i32 0, 2)
+    m = _TYPE.search(t)
+    if not m:
+        raise ValueError(f"cannot find a type in {t!r}")
+    return " ".join(m.group(0).replace("{", "{ ").replace("}", " }").replace(",", ", ").split())
 
 
 def extract_signatures(text):

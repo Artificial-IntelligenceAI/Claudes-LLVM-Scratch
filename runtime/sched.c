@@ -687,7 +687,10 @@ static void step_thread(Thread *th) {
 static int64_t work_ticks;
 
 /* sequencer.stepThreads */
+static double current_msecs;
+
 static void step_threads(void) {
+    current_msecs = now_ms; /* runtime.updateCurrentMSecs() */
     double work_time = 0.75 * (1000.0 / 30.0);
     double t0 = real_ms();
     int32_t tick = 0;
@@ -773,16 +776,20 @@ void rt_setup(void) {
     memcpy(targets, exec_t, sizeof(Target *) * (size_t)ntargets);
 }
 
+/* The project timer reads runtime.currentMSecs, which scratch-vm refreshes at
+ * the start of stepThreads -- after edge-activated hats were evaluated, so
+ * `when timer >` predicates see the previous frame's clock. */
 static double timer_start_ms;
-double rt_timer(void) { return (now_ms - timer_start_ms) / 1000.0; }
-void rt_reset_timer(void) { timer_start_ms = now_ms; }
+double rt_timer(void) { return (current_msecs - timer_start_ms) / 1000.0; }
+void rt_reset_timer(void) { timer_start_ms = current_msecs; }
 
 void rt_green_flag(void) {
     rt_stop_all(NULL);
     /* nothing was running: drop the stale list immediately */
     while (nstale > 0) { ThreadList *old = stale_lists[--nstale]; free(old->v); free(old); }
     rt_stop_flag = 0;
-    timer_start_ms = now_ms;
+    current_msecs = now_ms;
+    timer_start_ms = current_msecs;
     for (int32_t i = 0; i < ntargets; i++) {
         Target *t = targets[i];
         memset(t->edge_has, 0, (size_t)t->sprite->nscripts + 1);
