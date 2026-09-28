@@ -352,7 +352,15 @@ const main = async () => {
     // synchronous: process.exit() can truncate pending async pipe writes
     const buf = Buffer.from(out.join('\n') + '\n');
     let off = 0;
-    while (off < buf.length) off += fs.writeSync(1, buf, off, buf.length - off);
+    const pause = new Int32Array(new SharedArrayBuffer(4));
+    while (off < buf.length) {
+        try {
+            off += fs.writeSync(1, buf, off, buf.length - off);
+        } catch (e) {
+            if (e.code !== 'EAGAIN') throw e;
+            Atomics.wait(pause, 0, 0, 5); // pipe full (non-blocking stdout): retry
+        }
+    }
     process.exit(0);
 };
 
