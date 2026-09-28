@@ -848,3 +848,31 @@ Str *rt_answer(void) {
     rt_retain_str(s);
     return s;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Music extension timing (sounds are silent headless, but beats take time) */
+
+static double tempo = 60;
+double rt_get_tempo(void) { return tempo; }
+void rt_set_tempo(double t, int32_t change) {
+    if (change) t = t + tempo;
+    tempo = clamp(t, 20, 500); /* TEMPO_RANGE */
+}
+
+/* playDrumForBeats / restForBeats / playNoteForBeats: a stack timer of
+ * (60 / tempo) * clamp(beats, 0, 100) seconds that yields (no redraw).
+ * kind 1 (note) with 0 beats does not wait at all. Returns -1 when done. */
+int32_t rt_music_wait(Thread *th, Frame *fr, double beats, int32_t kind, int32_t first) {
+    (void)th;
+    if (first || !fr->timer_on) {
+        beats = clamp(beats, 0, 100);
+        if (kind == 1 && beats == 0) return -1;
+        fr->timer_on = 1;
+        fr->timer_start = rt_now_ms();
+        fr->timer_dur = (60 / tempo) * beats;
+        return R_YIELD;
+    }
+    if (rt_now_ms() - fr->timer_start < fr->timer_dur * 1000) return R_YIELD;
+    fr->timer_on = 0;
+    return -1;
+}

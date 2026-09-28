@@ -627,6 +627,8 @@ class CodeGen:
             return V(STR, self.call(ctx, "rt_username", []), owned=True)
         if op == "control_get_counter":
             return V(NUM, self.call(ctx, "rt_get_counter", []))
+        if op == "music_getTempo":
+            return V(NUM, self.call(ctx, "rt_get_tempo", []))
         if op == "sound_volume":
             return V(NUM, self.call(ctx, "cg_get_volume", [("ptr", t)]))
         raise NotImplementedError(op)
@@ -951,8 +953,12 @@ class CodeGen:
         def strv(name):
             return self.to_str(ctx, vals.get(name, self.lit(ctx, "")))
 
+        if op == "event_broadcastandwait" and isinstance(s.args.get("BROADCAST_INPUT"), Lit) \
+                and s.args["BROADCAST_INPUT"].value is None:
+            return
         if op in ("control_wait", "control_wait_until", "motion_glidesecstoxy", "motion_glideto",
-                  "event_broadcastandwait", "looks_switchbackdroptoandwait"):
+                  "event_broadcastandwait", "looks_switchbackdroptoandwait", "music_playDrumForBeats",
+                  "music_midiPlayDrumForBeats", "music_restForBeats", "music_playNoteForBeats"):
             assert ctx.mode == "R", op
 
             def body(first):
@@ -960,6 +966,10 @@ class CodeGen:
                 vals = self.eval_args(ctx, s)
                 if op == "control_wait":
                     return self.call(ctx, "rt_wait", [("ptr", th), ("ptr", ctx.fr), ("double", num("DURATION")), ("i32", first)])
+                if op.startswith("music_"):
+                    kind = {"music_playNoteForBeats": 1}.get(op, 0)
+                    return self.call(ctx, "rt_music_wait", [("ptr", th), ("ptr", ctx.fr), ("double", num("BEATS")),
+                                                            ("i32", str(kind)), ("i32", first)])
                 if op == "control_wait_until":
                     c = self.to_bool(ctx, vals.get("CONDITION", V(BOOL, "false")))
                     return self.op2(ctx, f"select i1 {c}, i32 -1, i32 {R_YIELD}")
@@ -1007,6 +1017,8 @@ class CodeGen:
 
         if op == "event_broadcast":
             e = s.args.get("BROADCAST_INPUT")
+            if isinstance(e, Lit) and e.value is None:
+                return  # broadcast id that resolves to no message
             if isinstance(e, Lit):
                 self.call(ctx, "rt_broadcast", [("ptr", self.str_lit(str(e.value).lower()))])
             else:
@@ -1064,8 +1076,7 @@ class CodeGen:
         if op in ("data_showvariable", "data_hidevariable", "data_showlist", "data_hidelist",
                   "looks_hideallsprites", "looks_changestretchby", "looks_setstretchto",
                   "motion_align_scene", "motion_xscroll", "motion_yscroll", "sensing_setdragmode",
-                  "sound_play", "sound_playuntildone", "sound_stopallsounds", "sound_seteffectto",
-                  "sound_changeeffectby", "sound_cleareffects",
+                  "sound_play", "sound_playuntildone", "sound_stopallsounds", "sound_cleareffects",
                   "pen_setPenShadeToNumber", "pen_changePenShadeBy", "pen_setPenHueToNumber", "pen_changePenHueBy"):
             for v in vals.values():
                 self.release(ctx, v)
@@ -1129,8 +1140,7 @@ class CodeGen:
                  "motion_pointindirection": ("rt_point_dir", "DIRECTION"), "motion_changexby": ("cg_change_x", "DX"),
                  "motion_setx": ("cg_set_x", "X"), "motion_changeyby": ("cg_change_y", "DY"),
                  "motion_sety": ("cg_set_y", "Y"), "pen_changePenSizeBy": ("rt_pen_change_size", "SIZE"),
-                 "pen_setPenSizeTo": ("rt_pen_set_size", "SIZE"), "sound_changevolumeby": ("cg_change_volume", "VOLUME"),
-                 "sound_setvolumeto": ("cg_set_volume", "VOLUME")}
+                 "pen_setPenSizeTo": ("rt_pen_set_size", "SIZE")}
         if op in num_t:
             fn, name = num_t[op]
             self.call(ctx, fn, [("ptr", t), ("double", num(name))])
@@ -1146,6 +1156,25 @@ class CodeGen:
             return
         if op == "motion_setrotationstyle":
             self.call(ctx, "rt_set_rotation_style", [("ptr", t), ("ptr", self.str_lit(str(s.fields.get("STYLE", ""))))])
+            return
+        if op in ("sound_setvolumeto", "sound_changevolumeby"):
+            # sound._updateVolume returns Promise.resolve(): yields until the next frame
+            fn = "cg_set_volume" if op == "sound_setvolumeto" else "cg_change_volume"
+            self.call(ctx, fn, [("ptr", t), ("double", num("VOLUME"))])
+            self.promise(ctx, self.call(ctx, "rt_promise_immediate", [("ptr", th)]))
+            return
+        if op in ("sound_seteffectto", "sound_changeeffectby"):
+            for v in vals.values():
+                self.release(ctx, v)
+            if str(s.fields.get("EFFECT", "")).lower() in ("pitch", "pan") and ctx.mode == "R":
+                self.promise(ctx, self.call(ctx, "rt_promise_immediate", [("ptr", th)]))
+            return
+        if op in ("music_setTempo", "music_changeTempo"):
+            self.call(ctx, "rt_set_tempo", [("double", num("TEMPO")), ("i32", "1" if op == "music_changeTempo" else "0")])
+            return
+        if op in ("music_setInstrument", "music_midiSetInstrument"):
+            for v in vals.values():
+                self.release(ctx, v)
             return
         if op in ("looks_changeeffectby", "looks_seteffectto"):
             eff = self.str_lit(str(s.fields.get("EFFECT", "")))
@@ -1301,6 +1330,8 @@ class CodeGen:
                                                      ("double", hexd(c.w)), ("double", hexd(c.h)),
                                                      ("double", hexd(c.cx / c.bitmap_res)),
                                                      ("double", hexd(c.cy / c.bitmap_res))] + raster)
+            if s.is_stage:
+                self.call(ctx, "rt_set_tempo", [("double", hexd(s.tempo)), ("i32", "0")])
             cur = s.current_costume if 0 <= s.current_costume < max(1, len(s.costumes)) else 0
             self.call(ctx, "rt_sprite_state", [("ptr", sp), ("double", hexd(s.x)), ("double", hexd(s.y)),
                                                ("double", hexd(s.direction)), ("double", hexd(s.size)),

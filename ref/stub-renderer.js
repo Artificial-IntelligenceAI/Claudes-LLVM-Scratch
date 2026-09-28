@@ -35,10 +35,11 @@ class StubRenderer {
         this.skins[id] = {w, h, rc: rc ? rc.slice() : [w / 2, h / 2]};
     }
     createBitmapSkin (canvas, res, rc) {
+        // scratch-vm passes the rotation centre already in logical pixels
         const r = res || 1;
         const w = (canvas && canvas.width ? canvas.width : 0) / r;
         const h = (canvas && canvas.height ? canvas.height : 0) / r;
-        this.skins.push({w, h, rc: rc ? [rc[0] / r, rc[1] / r] : [w / 2, h / 2]});
+        this.skins.push({w, h, rc: rc ? [rc[0], rc[1]] : [w / 2, h / 2]});
         return this.skins.length - 1;
     }
     updateBitmapSkin (id, canvas, res, rc) {

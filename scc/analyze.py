@@ -42,7 +42,7 @@ NUM_OPS = {
     "data_itemnumoflist", "data_lengthoflist", "motion_xposition", "motion_yposition",
     "motion_direction", "looks_size", "sensing_distanceto", "sensing_loudness", "sensing_timer",
     "sensing_current", "sensing_dayssince2000",
-    "control_get_counter", "sound_volume",
+    "control_get_counter", "sound_volume", "music_getTempo",
 }
 STR_OPS = {"operator_join", "operator_letter_of", "sensing_answer", "sensing_username",
            "sensing_mousex", "sensing_mousey"}
@@ -56,7 +56,8 @@ BOOL_OPS = {
 YIELDING = {
     "control_wait", "control_wait_until", "motion_glideto", "motion_glidesecstoxy",
     "looks_sayforsecs", "looks_thinkforsecs", "sensing_askandwait", "event_broadcastandwait",
-    "looks_switchbackdroptoandwait",
+    "looks_switchbackdroptoandwait", "music_playDrumForBeats", "music_midiPlayDrumForBeats",
+    "music_restForBeats", "music_playNoteForBeats", "sound_setvolumeto", "sound_changevolumeby",
 }
 
 # reporters with side effects visible to later code (random number consumption)
@@ -302,6 +303,9 @@ class Analyzer:
 
     def _has_yield(self, stmts):
         for s in stmts:
+            if isinstance(s, Op) and s.opcode in ("sound_seteffectto", "sound_changeeffectby") and \
+                    str(s.fields.get("EFFECT", "")).lower() in ("pitch", "pan"):
+                return True
             if isinstance(s, If):
                 if self._has_yield(s.then) or self._has_yield(s.else_):
                     return True

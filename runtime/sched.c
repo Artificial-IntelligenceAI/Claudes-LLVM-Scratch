@@ -572,6 +572,19 @@ static void fire_due_timers(void) {
     ntimers -= k;
 }
 
+/* Promises that resolve immediately (Promise.resolve()): the thread resumes
+ * after the current step's microtasks, i.e. before the next frame's timers. */
+static int64_t *immediates;
+static int32_t nimm, capimm;
+int32_t rt_promise_immediate(Thread *th) {
+    PUSH(immediates, nimm, capimm, th->uid);
+    return R_PROMISE;
+}
+void rt_resolve_immediates(void) {
+    for (int32_t i = 0; i < nimm; i++) resume_thread_uid(immediates[i]);
+    nimm = 0;
+}
+
 /* Pending answers for ask-and-wait are resolved at the end of the frame
  * (the oracle answers in a microtask after the step). */
 static int64_t *answer_waiters;
@@ -820,11 +833,12 @@ void rt_step(void) {
     step_threads();
 }
 
-int32_t rt_idle(void) { return threads->n == 0 && ntimers == 0 && nanswer == 0; }
+int32_t rt_idle(void) { return threads->n == 0 && ntimers == 0 && nanswer == 0 && nimm == 0; }
 
 void rt_frame_begin(void) { fire_due_timers(); }
 
 void rt_frame_end(void) {
+    rt_resolve_immediates();
     now_ms += 1000.0 / 30.0;
 }
 

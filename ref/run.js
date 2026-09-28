@@ -21,6 +21,9 @@
  */
 'use strict';
 process.env.TZ = 'UTC';
+// scratch-vm logs warnings to stdout; the trace is written with fs.writeSync
+// at the end, so route everything else to stderr.
+process.stdout.write = (chunk, enc, cb) => process.stderr.write(chunk, enc, cb);
 
 const fs = require('fs');
 const path = require('path');
@@ -84,6 +87,26 @@ const vmSrc = path.join(__dirname, 'node_modules/scratch-vm/src');
 const uidPath = require.resolve(path.join(vmSrc, 'util/uid.js'));
 let uidN = 0;
 require.cache[uidPath] = {id: uidPath, filename: uidPath, loaded: true, exports: () => `uid${uidN++}`};
+// Minimal browser shims so scratch-vm can load bitmap (PNG/JPEG) costumes in
+// Node. Only dimensions matter to the stub renderer, so images are never decoded.
+const imageSize = bytes => {
+    const b = Buffer.from(bytes);
+    if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50) return {width: b.readUInt32BE(16), height: b.readUInt32BE(20)};
+    if (b[0] === 0xFF && b[1] === 0xD8) {
+        let i = 2;
+        while (i + 9 < b.length) {
+            if (b[i] !== 0xFF) { i++; continue; }
+            const m = b[i + 1];
+            if (m >= 0xC0 && m <= 0xC2) return {width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5)};
+            i += 2 + b.readUInt16BE(i + 2);
+        }
+    }
+    return {width: 0, height: 0};
+};
+global.createImageBitmap = async blob => imageSize(new Uint8Array(await blob.arrayBuffer()));
+const fakeCanvas = () => ({width: 0, height: 0, getContext: () => ({drawImage () {}}), toDataURL: () => 'data:,'});
+global.document = global.document || {createElement: () => fakeCanvas(), hidden: false};
+
 const VM = require(path.join(vmSrc, 'index.js'));
 let ScratchStorage = require('scratch-storage');
 if (ScratchStorage.ScratchStorage) ScratchStorage = ScratchStorage.ScratchStorage;
@@ -132,10 +155,11 @@ class StubRenderer {
         this.skins[id] = {w, h, rc: rc ? rc.slice() : [w / 2, h / 2]};
     }
     createBitmapSkin (canvas, res, rc) {
+        // scratch-vm passes the rotation centre already in logical pixels
         const r = res || 1;
         const w = (canvas && canvas.width ? canvas.width : 0) / r;
         const h = (canvas && canvas.height ? canvas.height : 0) / r;
-        this.skins.push({w, h, rc: rc ? [rc[0] / r, rc[1] / r] : [w / 2, h / 2]});
+        this.skins.push({w, h, rc: rc ? [rc[0], rc[1]] : [w / 2, h / 2]});
         return this.skins.length - 1;
     }
     updateBitmapSkin (id, canvas, res, rc) {
@@ -261,6 +285,10 @@ const main = async () => {
     const storage = new ScratchStorage();
     vm.attachStorage(storage);
     vm.attachRenderer(new StubRenderer());
+    vm.attachV2BitmapAdapter({
+        resize: (canvas, w, h) => Object.assign(fakeCanvas(), {width: w, height: h}),
+        convertDataURIToBinary: () => new Uint8Array(0)
+    });
     const rt = vm.runtime;
 
     rt.on('SAY', (target, type, text) => {
@@ -293,6 +321,9 @@ const main = async () => {
     const hasEdgeHats = rt.targets.some(t => Object.values(t.blocks._blocks).some(
         b => b.opcode === 'event_whengreaterthan'));
 
+    // timers created while loading (e.g. scratch-vm's canvas pool cleanup) are
+    // not part of the project's behaviour
+    timers.length = 0;
     vm.greenFlag();
     const flush = async () => {
         for (let i = 0; i < 8; i++) await Promise.resolve();

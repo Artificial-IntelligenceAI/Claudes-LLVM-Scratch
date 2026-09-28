@@ -54,6 +54,8 @@ STATEMENTS = {
     "pen_setPenShadeToNumber", "pen_changePenShadeBy", "pen_setPenHueToNumber", "pen_changePenHueBy",
     "sound_play", "sound_playuntildone", "sound_stopallsounds", "sound_seteffectto",
     "sound_changeeffectby", "sound_cleareffects", "sound_changevolumeby", "sound_setvolumeto",
+    "music_playDrumForBeats", "music_midiPlayDrumForBeats", "music_restForBeats", "music_playNoteForBeats",
+    "music_setTempo", "music_changeTempo", "music_setInstrument", "music_midiSetInstrument",
 }
 
 REPORTERS = {
@@ -68,7 +70,7 @@ REPORTERS = {
     "sensing_distanceto", "sensing_answer", "sensing_keypressed", "sensing_mousedown",
     "sensing_mousex", "sensing_mousey", "sensing_loudness", "sensing_loud", "sensing_timer",
     "sensing_of", "sensing_current", "sensing_dayssince2000", "sensing_username",
-    "control_get_counter", "sound_volume",
+    "control_get_counter", "sound_volume", "music_getTempo",
 }
 
 CONTROL = {"control_if", "control_if_else", "control_repeat", "control_forever",
@@ -113,6 +115,13 @@ class Loader:
         targets = self.project["targets"]
         self.prog.extensions = self.project.get("extensions", [])
         stage_json = next(t for t in targets if t.get("isStage"))
+        # Target.lookupBroadcastMsg resolves by id first (stage variables), and
+        # uses that message's name even if the block's input text disagrees.
+        self.broadcast_ids = dict(stage_json.get("broadcasts", {}))
+        for vid, arr in stage_json.get("variables", {}).items():
+            self.broadcast_ids.setdefault(vid, arr[0])
+        for vid, arr in stage_json.get("lists", {}).items():
+            self.broadcast_ids.setdefault(vid, arr[0])
         ordered = [stage_json] + [t for t in targets if not t.get("isStage")]
         self.sprites = []
         for tj in ordered:
@@ -161,6 +170,8 @@ class Loader:
         s.current_costume = int(tj.get("currentCostume", 0) or 0)
         s.layer = int(tj.get("layerOrder", 0) or 0)
         s.volume = float(tj.get("volume", 100) or 0)
+        if s.is_stage:
+            s.tempo = float(tj.get("tempo", 60) or 60)
         if not s.is_stage:
             s.x = float(tj.get("x", 0) or 0)
             s.y = float(tj.get("y", 0) or 0)
@@ -384,8 +395,23 @@ class Loader:
         # broadcast inputs: a literal [11, name, id] or a reporter
         if "BROADCAST_INPUT" in b.get("inputs", {}):
             inp = b["inputs"]["BROADCAST_INPUT"]
+            lit = None
             if isinstance(inp[1], list) and inp[1] and inp[1][0] == 11:
-                args["BROADCAST_INPUT"] = Lit(str(inp[1][1]))
+                lit = (inp[1][1], inp[1][2] if len(inp[1]) > 2 else None)
+            elif isinstance(inp[1], str) and inp[1] == (inp[2] if len(inp) > 2 else None):
+                sh = self.blocks.get(inp[1], {})
+                f = sh.get("fields", {}).get("BROADCAST_OPTION")
+                if f:
+                    lit = (f[0], f[1] if len(f) > 1 else None)
+            if lit is not None:
+                name, bid = lit
+                if bid:
+                    resolved = self.broadcast_ids.get(bid)
+                else:
+                    resolved = next((n for n in self.broadcast_ids.values()
+                                     if str(n).lower() == str(name).lower()), None)
+                # an id that resolves to nothing makes the broadcast a no-op
+                args["BROADCAST_INPUT"] = Lit(str(resolved)) if resolved is not None else Lit(None)
         return Op(op, args, fields, ref)
 
     def input(self, b, name):
@@ -441,8 +467,10 @@ class Loader:
         if len(fields) == 1 and not b.get("inputs"):
             v = list(fields.values())[0][0]
             return Lit(_num(v))
+        # scratch-vm evaluates an unknown (or obsolete, no-op) reporter to
+        # undefined; String(undefined) is "undefined"
         self.unsupported[op] = self.unsupported.get(op, 0) + 1
-        return Lit("")
+        return Lit("undefined")
 
 
 def load(path_or_file):

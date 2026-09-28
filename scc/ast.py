@@ -181,6 +181,7 @@ class Sprite:
         self.layer = 0
         self.rotation_style = 0
         self.volume = 100.0
+        self.tempo = 60.0
 
 
 class Program:
