@@ -183,6 +183,11 @@ class CodeGen:
         self.strings[s] = name
         return name
 
+    def image_global(self, data):
+        name = f"@.img{len(self.globals)}"
+        self.globals.append(f"{name} = internal constant [{len(data)} x i8] c\"{llvm_str_bytes(data)}\", align 16")
+        return name
+
     def call(self, ctx, name, args, want=None):
         """Call a runtime function; args are (type, value) pairs. Returns the result
         ssa (or (tag, bits) for a { i64, i64 } result)."""
@@ -1287,7 +1292,8 @@ class CodeGen:
                     self.call(ctx, "rt_sprite_list_item", [("ptr", sp), ("i32", str(L.index))] + self.value_args(ctx, item))
             for i, c in enumerate(s.costumes):
                 if c.raster:
-                    rw, rh, scale, gname = c.raster
+                    rw, rh, scale, rgba = c.raster
+                    gname = self.image_global(rgba)
                     raster = [("i32", str(rw)), ("i32", str(rh)), ("double", hexd(scale)), ("ptr", gname)]
                 else:
                     raster = [("i32", "0"), ("i32", "0"), ("double", hexd(1.0)), ("ptr", "null")]

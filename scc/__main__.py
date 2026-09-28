@@ -12,7 +12,7 @@ from . import rtbuild
 from .load import load
 from .analyze import analyze
 from .codegen import generate
-from .costumes import measure_all
+from .costumes import measure_all, rasterize_all
 
 
 def main(argv=None):
@@ -23,6 +23,7 @@ def main(argv=None):
     ap.add_argument("-O", dest="opt", default="3", help="optimisation level for LTO (default 3)")
     ap.add_argument("-q", "--quiet", action="store_true")
     ap.add_argument("--time", action="store_true", help="print compile phase timings")
+    ap.add_argument("--no-images", action="store_true", help="do not embed costume rasters (no --render output)")
     args = ap.parse_args(argv)
 
     out = args.output or os.path.splitext(os.path.basename(args.input))[0]
@@ -31,13 +32,15 @@ def main(argv=None):
     t1 = time.time()
     prog = load(args.input)
     measure_all(prog)
+    if not args.no_images:
+        rasterize_all(prog)
     analyze(prog)
     ir = generate(prog, abi)
     t2 = time.time()
     ll = args.emit_llvm or out + ".ll"
     with open(ll, "w") as f:
         f.write(ir)
-    cmd = [rtbuild.CLANG, f"-O{args.opt}", "-flto", "-fno-math-errno", ll, *objs, "-o", out, "-lm"]
+    cmd = [rtbuild.CLANG, f"-O{args.opt}", "-flto", "-fno-math-errno", ll, *objs, "-o", out, "-lm", "-lz"]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if not args.emit_llvm:
         os.remove(ll)
