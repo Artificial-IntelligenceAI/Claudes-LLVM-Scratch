@@ -1321,11 +1321,14 @@ class CodeGen:
                     self.call(ctx, "rt_sprite_list_item", [("ptr", sp), ("i32", str(L.index))] + self.value_args(ctx, item))
             for i, c in enumerate(s.costumes):
                 if c.raster:
+                    import zlib
                     rw, rh, scale, rgba = c.raster
-                    gname = self.image_global(rgba)
-                    raster = [("i32", str(rw)), ("i32", str(rh)), ("double", hexd(scale)), ("ptr", gname)]
+                    z = zlib.compress(rgba, 9)
+                    gname = self.image_global(z)
+                    raster = [("i32", str(rw)), ("i32", str(rh)), ("double", hexd(scale)), ("ptr", gname),
+                              ("i32", str(len(z)))]
                 else:
-                    raster = [("i32", "0"), ("i32", "0"), ("double", hexd(1.0)), ("ptr", "null")]
+                    raster = [("i32", "0"), ("i32", "0"), ("double", hexd(1.0)), ("ptr", "null"), ("i32", "0")]
                 self.call(ctx, "rt_sprite_costume", [("ptr", sp), ("i32", str(i)), ("ptr", self.str_lit(c.name)),
                                                      ("double", hexd(c.w)), ("double", hexd(c.h)),
                                                      ("double", hexd(c.cx / c.bitmap_res)),

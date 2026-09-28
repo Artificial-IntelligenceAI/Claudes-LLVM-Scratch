@@ -134,7 +134,9 @@ typedef struct Costume {
     /* rasterized RGBA (premultiplied=0), for rendering; may be NULL */
     int img_w, img_h;  /* raster size in pixels */
     double img_scale;  /* raster pixels per logical pixel */
-    const uint8_t *rgba;
+    const uint8_t *rgba;     /* decompressed on first use by the renderer */
+    const uint8_t *rgba_z;   /* zlib-compressed RGBA embedded in the binary */
+    int32_t rgba_zlen;
 } Costume;
 
 typedef struct Sprite {
@@ -377,7 +379,7 @@ void rt_sprite_var(Sprite *s, int32_t i, Str *name, Value init);
 void rt_sprite_list(Sprite *s, int32_t i, Str *name);
 void rt_sprite_list_item(Sprite *s, int32_t i, Value item);
 void rt_sprite_costume(Sprite *s, int32_t i, Str *name, double w, double h, double cx, double cy,
-                       int32_t img_w, int32_t img_h, double img_scale, const uint8_t *rgba);
+                       int32_t img_w, int32_t img_h, double img_scale, const uint8_t *rgba_z, int32_t zlen);
 void rt_sprite_state(Sprite *s, double x, double y, double dir, double size, int32_t visible,
                      int32_t costume, int32_t layer, int32_t rotation_style, double volume);
 Script *rt_add_script(Sprite *s, int32_t hat, ResumableFn fn, int32_t nslots, Str *match,

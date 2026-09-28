@@ -109,12 +109,22 @@ static void hsv_to_rgb(double h, double s, double v, double *r, double *g, doubl
     }
 }
 
+/* Costume rasters are embedded zlib-compressed; inflate on first use. */
+static const uint8_t *pixels(Costume *c) {
+    if (c->rgba || !c->rgba_z || c->img_w <= 0) return c->rgba;
+    uLongf n = (uLongf)c->img_w * (uLongf)c->img_h * 4;
+    uint8_t *buf = (uint8_t *)malloc(n);
+    if (uncompress(buf, &n, c->rgba_z, (uLong)c->rgba_zlen) != Z_OK) { free(buf); c->rgba_z = NULL; return NULL; }
+    c->rgba = buf;
+    return buf;
+}
+
 /* Draw a target into the pen layer (premultiplied RGBA) or the RGB accumulator. */
 static void draw_target(Target *t, float *dst_pen, double *dst_rgb) {
     Sprite *s = t->sprite;
     if (s->ncostumes == 0) return;
     Costume *c = &s->costumes[t->costume];
-    if (!c->rgba || c->img_w <= 0) return;
+    if (!pixels(c) || c->img_w <= 0) return;
     double dir = t->dir, sx = t->size, sy = t->size;
     if (t->is_stage) { dir = 90; sx = sy = 100; }
     else if (t->rotation_style == 2) dir = 90;

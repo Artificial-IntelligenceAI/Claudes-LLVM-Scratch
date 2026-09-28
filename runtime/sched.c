@@ -60,11 +60,14 @@ void rt_sprite_list(Sprite *s, int32_t i, Str *name) { s->list_names[i] = name; 
 void rt_sprite_list_item(Sprite *s, int32_t i, Value item) { rt_list_add(&s->list_init[i], item); }
 
 void rt_sprite_costume(Sprite *s, int32_t i, Str *name, double w, double h, double cx, double cy,
-                       int32_t img_w, int32_t img_h, double img_scale, const uint8_t *rgba) {
+                       int32_t img_w, int32_t img_h, double img_scale, const uint8_t *rgba_z, int32_t zlen) {
     Costume *c = &s->costumes[i];
     c->name = name;
     c->w = w; c->h = h; c->cx = cx; c->cy = cy;
-    c->img_w = img_w; c->img_h = img_h; c->img_scale = img_scale; c->rgba = rgba;
+    c->img_w = img_w; c->img_h = img_h; c->img_scale = img_scale;
+    c->rgba = NULL;
+    c->rgba_z = rgba_z;
+    c->rgba_zlen = zlen;
 }
 
 void rt_sprite_state(Sprite *s, double x, double y, double dir, double size, int32_t visible,
