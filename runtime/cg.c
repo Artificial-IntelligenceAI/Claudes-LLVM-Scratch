@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /*
  * Small non-inline helpers for compiler-generated code. Everything here is
  * inlined into compiled scripts by link-time optimisation.

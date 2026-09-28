@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """A pen spirograph plus bouncing clones -- the README demo.
 
     python3 examples/spirograph.py            # writes build/examples/spirograph.sb3

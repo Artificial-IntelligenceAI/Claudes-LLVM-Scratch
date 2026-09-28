@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Casting, number formatting, operators and exact value types."""
 from sb3 import *
 

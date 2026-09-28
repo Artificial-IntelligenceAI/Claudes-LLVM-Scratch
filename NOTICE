@@ -1,0 +1,61 @@
+Claude's LLVM Scratch
+Copyright (C) 2026 Tankun Sriket
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3 only (AGPL-3.0-only), the same licence as the
+Scratch projects it is derived from. See LICENSE for the full text.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+
+Derived from Scratch (AGPL-3.0-only)
+------------------------------------
+
+Parts of this program are translations of, or are closely modelled on, code in
+scratch-vm 5.0.300 and scratch-render 2.x by the Scratch Foundation
+(https://github.com/scratchfoundation), licensed AGPL-3.0-only. They were
+translated from JavaScript to C and Python and adapted in 2026. In particular:
+
+  runtime/sched.c    thread scheduling, hats, clones, stop-all:
+                     src/engine/sequencer.js, runtime.js, thread.js,
+                     src/sprites/rendered-target.js
+  runtime/value.c    Scratch casts and comparisons: src/util/cast.js,
+  runtime/cg.c       src/blocks/scratch3_operators.js
+  runtime/list.c     list blocks: src/blocks/scratch3_data.js
+  runtime/blocks.c   looks, motion, sensing, pen and music blocks:
+                     src/blocks/scratch3_looks.js, scratch3_motion.js,
+                     scratch3_sensing.js, scratch3_sound.js,
+                     src/extensions/scratch3_pen, scratch3_music,
+                     src/util/color.js, math-util.js; sprite fencing from
+                     scratch-render src/RenderWebGL.js
+  ref/run.js,        stub renderer mirroring scratch-render's fencing and
+  ref/stub-renderer.js  bounds behaviour
+  scc/load.py        project.json interpretation mirroring scratch-vm's
+                     deserialisation and block execution rules
+
+The test oracle and benchmarks (ref/) run scratch-vm itself. It is downloaded
+by bench/setup.sh and is not included in this repository. The benchmarks can
+also download TurboWarp's scratch-vm fork (MPL-2.0), which is likewise not
+included.
+
+
+Trademarks
+----------
+
+The Scratch trademarks, including the Scratch name, logo, the Scratch Cat,
+Gobo, Pico, Nano, Tera and Giga graphics (the "Marks"), are property of the
+Massachusetts Institute of Technology (MIT). Marks may not be used to endorse
+or promote products derived from this software without specific prior written
+permission. This project is not affiliated with or endorsed by MIT or the
+Scratch Foundation.
+
+
+Other third-party code
+----------------------
+
+runtime/fdlibm/ieee754.cc is V8's port of fdlibm (V8 12.4). It carries its own
+licences, which are compatible with the AGPL: runtime/fdlibm/LICENSE.v8
+(BSD-style) and runtime/fdlibm/LICENSE.fdlibm (Sun Microsystems notice).

@@ -151,12 +151,18 @@ Known and deliberate; most follow from running headless.
 | `bench/` | benchmark projects and runner; `results.json` holds the latest numbers |
 | `tools/` | `sb3.py` project DSL, `sb3dump.py` pretty-printer |
 
-## Credits and licences
+## Licence
 
-* `runtime/fdlibm/ieee754.cc` is V8's port of fdlibm (BSD-style V8 licence, `LICENSE.v8`, and
-  Sun's fdlibm notice, `LICENSE.fdlibm`), compiled with small shims.
-* `scratch-vm` (AGPL-3.0) and TurboWarp's `scratch-vm` fork (MPL-2.0) are used only as external
-  reference implementations for testing and benchmarking. They are downloaded by
-  `bench/setup.sh` and not redistributed here. The conformance fixtures are read from that
-  download.
-* This repository does not yet have a licence of its own; that is the owner's call.
+Copyright (C) 2026 Tankun Sriket. Licensed under the **GNU Affero General Public License v3.0 only**
+(`AGPL-3.0-only`), the same licence as `scratch-vm` and `scratch-render`, parts of which this project
+translates. See [`LICENSE`](LICENSE), and [`NOTICE`](NOTICE) for which files derive from which Scratch
+sources.
+
+* `runtime/fdlibm/ieee754.cc` is V8's port of fdlibm, under its own AGPL-compatible licences
+  (`LICENSE.v8`, BSD-style, and `LICENSE.fdlibm`, Sun's notice). It is compiled with small shims.
+* `scratch-vm` and TurboWarp's `scratch-vm` fork (MPL-2.0) are used as external reference
+  implementations for testing and benchmarking. `bench/setup.sh` downloads them, and they are
+  not included here. The conformance fixtures are read from that download.
+* The Scratch name and marks belong to MIT and may not be used to endorse or promote derived
+  products without permission. This project is not affiliated with or endorsed by MIT or the
+  Scratch Foundation.

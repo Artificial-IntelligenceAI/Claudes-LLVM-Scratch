@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /*
  * Software renderer: composites the stage the way scratch-render layers it
  * (backdrop, pen layer, sprites in execution order) and writes PNG frames.

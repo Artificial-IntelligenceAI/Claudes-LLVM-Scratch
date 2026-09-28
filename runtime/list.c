@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /*
  * Lists (scratch-vm src/blocks/scratch3_data.js). Items keep their original
  * type: a list of the strings "1","2","3" reports "123" but a list of the

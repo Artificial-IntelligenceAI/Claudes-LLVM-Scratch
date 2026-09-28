@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Motion, looks, clones, sensing, pen, ask, randomness."""
 from sb3 import *
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Broadcasts, procedures, recursion and warp mode."""
 from sb3 import *
 

@@ -8,8 +8,9 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "scratch-vm": "^5.0.300"
-  }
+  },
+  "private": true
 }

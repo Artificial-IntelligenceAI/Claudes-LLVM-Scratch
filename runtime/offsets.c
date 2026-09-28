@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /* Prints the struct layout facts the code generator needs, as JSON. */
 #include "rt.h"
 #include <stdio.h>

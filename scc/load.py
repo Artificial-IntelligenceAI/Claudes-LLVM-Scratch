@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Load a .sb3 and lower its blocks into the AST.
 

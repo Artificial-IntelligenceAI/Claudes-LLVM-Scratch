@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /*
  * Values, strings, and the Scratch cast rules (scratch-vm src/util/cast.js),
  * plus the JavaScript number<->string conversions they depend on.

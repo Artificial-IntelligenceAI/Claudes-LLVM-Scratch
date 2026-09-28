@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /*
  * Looks, motion, sensing and pen blocks, plus speech bubbles and the
  * sprite-bounds model used for fencing, bouncing and touching.

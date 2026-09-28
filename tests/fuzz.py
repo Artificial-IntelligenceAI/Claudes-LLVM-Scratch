@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Differential fuzzer: generate random Scratch projects, run them in scratch-vm
 and natively, and report any divergence.

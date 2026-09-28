@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """Pretty-print the scripts of a .sb3 as indented pseudo-code (for debugging)."""
 import json
 import sys

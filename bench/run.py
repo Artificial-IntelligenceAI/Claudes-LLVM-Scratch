@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Benchmark scratch-vm (interpreter), TurboWarp (JS compiler) and this
 project's native LLVM build on the same projects.

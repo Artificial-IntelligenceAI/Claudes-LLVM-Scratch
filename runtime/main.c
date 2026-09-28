@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: AGPL-3.0-only */
 /*
  * Entry point: frame loop, trace output (the same JSON-lines format as the
  * scratch-vm oracle in ref/run.js), and the end-of-run state dump.

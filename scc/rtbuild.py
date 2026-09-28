@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Build the runtime as LLVM bitcode (for link-time optimisation with compiled
 programs) and extract the ABI facts the code generator relies on:

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Run scratch-vm's own execute-fixture projects (from the TurboWarp clone,
 ref/turbowarp/scratch-vm/test/fixtures/execute/*.sb3) through the native

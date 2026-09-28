@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-only
 # Fetch the JavaScript implementations used as references:
 #   ref/node_modules/scratch-vm   the official interpreter (test oracle + benchmark)
 #   ref/turbowarp/scratch-vm      TurboWarp's compiler fork (benchmark only)

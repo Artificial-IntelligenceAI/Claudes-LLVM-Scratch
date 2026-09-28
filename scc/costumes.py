@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 Costume geometry (and, later, rasterization).
 

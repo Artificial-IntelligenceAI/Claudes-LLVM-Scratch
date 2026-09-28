@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only
 'use strict';
 // Stub renderer shared by the benchmark runner (a copy of the one in run.js,
 // minus trace output): redraw requests, fencing and set-size clamping behave

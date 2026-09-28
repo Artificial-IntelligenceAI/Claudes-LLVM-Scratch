@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """
 A small Python DSL for authoring Scratch 3 projects (.sb3) in code.
 

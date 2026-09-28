@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """scc: compile a Scratch 3 project (.sb3) to a native executable via LLVM.
 
     python3 -m scc project.sb3 -o project [--emit-llvm project.ll] [-O3]

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Benchmark projects. Each returns (Project, one-line description).
 
 Compute benchmarks use "run without screen refresh" custom blocks, which is

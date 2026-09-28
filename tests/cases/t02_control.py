@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only
 """Control flow, loops, yields and multi-thread interleaving."""
 from sb3 import *
 

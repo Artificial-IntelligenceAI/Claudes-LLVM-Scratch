@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: AGPL-3.0-only
 /*
  * Reference oracle: runs a .sb3 in the real scratch-vm, deterministically,
  * and prints a JSON-lines trace that the native binaries must reproduce.
